@@ -15,6 +15,7 @@ let pcDataChannel;
 let streamId;
 let sessionId;
 let sessionClientAnswer;
+let isStreamActive = false;
 
 let statsIntervalId;
 let lastBytesReceived;
@@ -95,8 +96,28 @@ connectButton.onclick = async () => {
   });
 };
 
+async function interruptStream() {
+  if (isStreamActive && streamId && sessionId) {
+    await fetch(`${DID_API.url}/${DID_API.service}/streams/${streamId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Basic ${DID_API.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    isStreamActive = false;
+    videoIsPlaying = false;
+    onVideoStatusChange(false, null);
+  }
+}
+
 const startButton = document.getElementById('start-button');
 startButton.onclick = async () => {
+  if (isStreamActive) {
+    await interruptStream();
+  }
+
   // connectionState not supported in firefox
   if (
     (peerConnection?.signalingState === 'stable' || peerConnection?.iceConnectionState === 'connected') &&
@@ -124,6 +145,8 @@ startButton.onclick = async () => {
         session_id: sessionId,
       }),
     });
+    
+    isStreamActive = true;
   }
 };
 
@@ -138,6 +161,7 @@ destroyButton.onclick = async () => {
     body: JSON.stringify({ session_id: sessionId }),
   });
 
+  isStreamActive = false;
   stopAllStreams();
   closePC();
 };
